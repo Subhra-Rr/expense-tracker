@@ -1,0 +1,21 @@
+import { categories, paymentMethods } from '../utils/expenseOptions'
+
+function ExpenseFilters({ filters, onChange, onReset }) {
+  return (
+    <section className="mt-8 rounded-2xl border border-slate-800/90 bg-slate-900/80 p-6 shadow-lg shadow-black/10 sm:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">Find a record</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Search and filter</h2></div><button className="self-start rounded-lg px-2 py-1 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-cyan-300 sm:self-auto" type="button" onClick={onReset}>Reset filters</button></div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <label className="text-sm font-medium text-slate-300">Search description<input className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white placeholder:text-slate-600 outline-none transition focus:border-cyan-400 focus:bg-slate-950" type="search" placeholder="e.g. groceries" value={filters.search} onChange={(event) => onChange('search', event.target.value)} /></label>
+        <label className="text-sm font-medium text-slate-300">Merchant<input className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white placeholder:text-slate-600 outline-none transition focus:border-cyan-400 focus:bg-slate-950" type="search" placeholder="e.g. Amazon" value={filters.merchant} onChange={(event) => onChange('merchant', event.target.value)} /></label>
+        <label className="text-sm font-medium text-slate-300">Tags<input className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white placeholder:text-slate-600 outline-none transition focus:border-cyan-400 focus:bg-slate-950" type="search" placeholder="e.g. work, travel" value={filters.tags} onChange={(event) => onChange('tags', event.target.value)} /></label>
+        <label className="text-sm font-medium text-slate-300">Category<select className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:bg-slate-950" value={filters.category} onChange={(event) => onChange('category', event.target.value)}><option value="">All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+        <label className="text-sm font-medium text-slate-300">Payment method<select className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:bg-slate-950" value={filters.paymentMethod} onChange={(event) => onChange('paymentMethod', event.target.value)}><option value="">All methods</option>{paymentMethods.map((method) => <option key={method}>{method}</option>)}</select></label>
+        <label className="text-sm font-medium text-slate-300">From<input className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:bg-slate-950" type="date" value={filters.startDate} onChange={(event) => onChange('startDate', event.target.value)} /></label>
+        <label className="text-sm font-medium text-slate-300">To<input className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:bg-slate-950" type="date" value={filters.endDate} onChange={(event) => onChange('endDate', event.target.value)} /></label>
+        <label className="text-sm font-medium text-slate-300">Sort by<select className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400 focus:bg-slate-950" value={filters.sort} onChange={(event) => onChange('sort', event.target.value)}><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="highest">Highest amount</option><option value="lowest">Lowest amount</option></select></label>
+      </div>
+    </section>
+  )
+}
+
+export default ExpenseFilters

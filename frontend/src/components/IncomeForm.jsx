@@ -1,0 +1,19 @@
+import { useState } from 'react'
+import { incomeCategories } from '../utils/incomeOptions'
+import { today } from '../utils/expenseOptions'
+
+function values(income) {
+  if (!income) return { amount: '', source: '', category: 'Salary', date: today(), account: '', notes: '' }
+  return { amount: income.amount, source: income.source, category: income.category, date: new Date(income.date).toISOString().slice(0, 10), account: income.account?._id || income.account, notes: income.notes || '' }
+}
+
+function IncomeForm({ accounts, initialIncome, error, submitting, onCancel, onSubmit }) {
+  const [form, setForm] = useState(() => values(initialIncome))
+  function update(event) { setForm({ ...form, [event.target.name]: event.target.value }) }
+  function submit(event) { event.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }
+  const activeAccounts = accounts.filter((account) => !account.archived)
+
+  return <section className="rounded-2xl border border-slate-800/90 bg-slate-900/80 p-6 shadow-lg shadow-black/10 sm:p-8"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Income</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{initialIncome ? 'Edit income' : 'Record income'}</h2></div>{initialIncome && <button className="text-sm font-medium text-slate-500" type="button" onClick={onCancel}>Cancel</button>}</div>{activeAccounts.length === 0 && <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Create an active account before recording income.</p>}{error && <p className="mt-5 rounded-xl border border-red-900/80 bg-red-950/40 p-3 text-sm text-red-200" role="alert">{error}</p>}<form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={submit}><label className="text-sm font-semibold text-slate-700">Amount<input className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" name="amount" type="number" min="0.01" step="0.01" required value={form.amount} onChange={update} /></label><label className="text-sm font-semibold text-slate-700">Date<input className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" name="date" type="date" required value={form.date} onChange={update} /></label><label className="text-sm font-semibold text-slate-700">Source<input className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" name="source" maxLength="160" placeholder="e.g. Monthly salary" required value={form.source} onChange={update} /></label><label className="text-sm font-semibold text-slate-700">Category<select className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" name="category" value={form.category} onChange={update}>{incomeCategories.map((category) => <option key={category}>{category}</option>)}</select></label><label className="text-sm font-semibold text-slate-700 sm:col-span-2">Destination account<select className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" name="account" required value={form.account} onChange={update}><option value="">Choose an account</option>{activeAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select></label><label className="text-sm font-semibold text-slate-700 sm:col-span-2">Notes<span className="ml-2 font-normal text-slate-500">Optional</span><textarea className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" name="notes" maxLength="500" value={form.notes} onChange={update} /></label><button className="rounded-xl bg-emerald-700 px-4 py-3.5 font-semibold text-white hover:bg-emerald-800 disabled:opacity-60 sm:col-span-2" disabled={submitting || activeAccounts.length === 0} type="submit">{submitting ? 'Saving...' : initialIncome ? 'Save changes' : 'Add income'}</button></form></section>
+}
+
+export default IncomeForm

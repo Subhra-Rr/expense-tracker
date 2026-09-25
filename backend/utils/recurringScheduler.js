@@ -1,0 +1,133 @@
+const mongoose = require('mongoose')
+const { Account } = require('../models/Account')
+const { Expense } = require('../models/Expense')
+const { Income } = require('../models/Income')
+const RecurringOccurrence = require('../models/RecurringOccurrence')
+const { RecurringRule } = require('../models/RecurringRule')
+const withTransaction = require('./transaction')
+const { createBudgetNotifications, createRecurringDueNotification } = require('./notificationService')
+
+const lockTimeoutMs = 5 * 60 * 1000
+
+function partsForDate(date, timezone) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
+  return Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+}
+
+function dateKey(date, timezone = 'Asia/Kolkata') {
+  const parts = partsForDate(date, timezone)
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+function keyDate(key) { return new Date(`${key}T00:00:00.000Z`) }
+
+function compareKeys(left, right) { return left.localeCompare(right) }
+
+function nextDateKey(currentKey, frequency, anchorKey) {
+  const [year, month, day] = currentKey.split('-').map(Number)
+  const [, anchorMonth, anchorDay] = anchorKey.split('-').map(Number)
+  const current = new Date(Date.UTC(year, month - 1, day))
+  if (frequency === 'Daily') current.setUTCDate(current.getUTCDate() + 1)
+  if (frequency === 'Weekly') current.setUTCDate(current.getUTCDate() + 7)
+  if (frequency === 'Monthly') {
+    const targetMonthIndex = current.getUTCMonth() + 1
+    const targetYear = current.getUTCFullYear() + (targetMonthIndex === 12 ? 1 : 0)
+    const normalizedMonthIndex = targetMonthIndex % 12
+    const lastDay = new Date(Date.UTC(targetYear, normalizedMonthIndex + 1, 0)).getUTCDate()
+    return `${targetYear}-${String(normalizedMonthIndex + 1).padStart(2, '0')}-${String(Math.min(anchorDay, lastDay)).padStart(2, '0')}`
+  }
+  if (frequency === 'Yearly') {
+    const nextYear = current.getUTCFullYear() + 1
+    const lastDay = new Date(Date.UTC(nextYear, anchorMonth, 0)).getUTCDate()
+    return `${nextYear}-${String(anchorMonth).padStart(2, '0')}-${String(Math.min(anchorDay, lastDay)).padStart(2, '0')}`
+  }
+  return current.toISOString().slice(0, 10)
+}
+
+function latestDue(startKey, frequency, anchorKey, todayKey) {
+  let current = startKey
+  let latest = null
+  let occurrences = 0
+  // Bound the catch-up scan while still covering centuries of daily schedules.
+  while (compareKeys(current, todayKey) <= 0 && occurrences < 12000) {
+    latest = current
+    current = nextDateKey(current, frequency, anchorKey)
+    occurrences += 1
+  }
+  return latest ? { latest, next: current, skipped: Math.max(0, occurrences - 1) } : null
+}
+
+async function processRule(rule) {
+  const todayKey = dateKey(new Date(), rule.timezone)
+  const nextKey = rule.nextDueDate.toISOString().slice(0, 10)
+  if (compareKeys(nextKey, todayKey) > 0) return
+  const lockDate = new Date()
+  const lockedRule = await RecurringRule.findOneAndUpdate(
+    { _id: rule._id, status: 'active', nextDueDate: rule.nextDueDate, $or: [{ processingAt: null }, { processingAt: { $exists: false } }, { processingAt: { $lt: new Date(Date.now() - lockTimeoutMs) } }] },
+    { $set: { processingAt: lockDate } },
+    { new: true },
+  ).select('+user')
+  if (!lockedRule) return
+
+  try {
+    const startKey = lockedRule.startDate.toISOString().slice(0, 10)
+    const latest = latestDue(startKey, lockedRule.frequency, startKey, todayKey)
+    if (!latest) return
+    const endKey = lockedRule.endDate?.toISOString().slice(0, 10)
+    if (endKey && compareKeys(latest.latest, endKey) > 0) {
+      await RecurringRule.updateOne({ _id: lockedRule._id }, { $set: { status: 'cancelled', processingAt: null } })
+      return
+    }
+
+    await withTransaction(async (session) => {
+      const account = await Account.findOne({ _id: lockedRule.account, user: lockedRule.user, archived: false }).session(session)
+      if (!account) {
+        await RecurringRule.updateOne({ _id: lockedRule._id }, { $set: { status: 'paused', lastError: 'The linked account is missing or archived.', processingAt: null } }, { session })
+        return
+      }
+      const occurrenceKey = `${lockedRule._id}:${latest.latest}`
+      const existing = await RecurringOccurrence.findOne({ occurrenceKey }).session(session)
+      if (!existing) {
+        const transactionData = {
+          amount: lockedRule.amount,
+          category: lockedRule.category,
+          date: keyDate(latest.latest),
+          account: lockedRule.account,
+          user: lockedRule.user,
+          recurringRule: lockedRule._id,
+          recurringOccurrenceKey: occurrenceKey,
+        }
+        let transaction
+        if (lockedRule.transactionType === 'Expense') {
+          transaction = (await Expense.create([{ ...transactionData, description: lockedRule.title, paymentMethod: lockedRule.paymentMethod || 'Other', notes: 'Generated by recurring rule.' }], { session }))[0]
+          await Account.updateOne({ _id: account._id }, { $inc: { currentBalance: -lockedRule.amount } }, { session })
+        } else {
+          transaction = (await Income.create([{ ...transactionData, source: lockedRule.title, notes: 'Generated by recurring rule.' }], { session }))[0]
+          await Account.updateOne({ _id: account._id }, { $inc: { currentBalance: lockedRule.amount } }, { session })
+        }
+        await RecurringOccurrence.create([{ rule: lockedRule._id, user: lockedRule.user, occurrenceKey, title: lockedRule.title, transactionType: lockedRule.transactionType, scheduledDate: keyDate(latest.latest), status: 'generated', transaction: transaction._id }], { session })
+      }
+      const endAfter = endKey && compareKeys(latest.next, endKey) > 0
+      await RecurringRule.updateOne({ _id: lockedRule._id }, { $set: { nextDueDate: keyDate(latest.next), lastGeneratedDate: keyDate(latest.latest), lastError: null, processingAt: null, ...(endAfter ? { status: 'cancelled' } : {}) }, $inc: { missedOccurrences: latest.skipped } }, { session })
+    })
+    if (lockedRule.transactionType === 'Expense') void createBudgetNotifications(lockedRule.user).catch(() => {})
+  } catch (error) {
+    await RecurringRule.updateOne({ _id: lockedRule._id }, { $set: { processingAt: null, lastError: error.message.slice(0, 500) } })
+  }
+}
+
+async function processDueRules() {
+  const rules = await RecurringRule.find({ status: 'active' }).select('+user').limit(1000)
+  await Promise.all(rules.map((rule) => createRecurringDueNotification(rule).catch(() => {})))
+  await Promise.all(rules.map((rule) => processRule(rule)))
+}
+
+function startRecurringScheduler() {
+  const run = () => processDueRules().catch((error) => console.error('Recurring scheduler error:', error.message))
+  run()
+  const timer = setInterval(run, 60 * 1000)
+  timer.unref()
+  return timer
+}
+
+module.exports = { dateKey, latestDue, nextDateKey, processDueRules, startRecurringScheduler }
