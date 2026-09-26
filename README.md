@@ -282,6 +282,10 @@ VITE_API_BASE_URL=https://your-backend-domain.com/api
 
 Cloudflare Pages handles the frontend deployment. No Wrangler configuration or deploy command is required. The Express backend must be deployed separately on a Node.js host.
 
+### Cloudflare Workers Static Frontend
+
+If deploying the frontend through the Workers setup flow instead, the repository includes `wrangler.jsonc`. Use `cd frontend && npm ci && npm run build` as the build command and `npx wrangler deploy` as the deploy command. The Express backend remains a separate Node.js service.
+
 For a production backend process:
 
 ```bash
