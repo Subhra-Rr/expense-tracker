@@ -263,6 +263,25 @@ npm run build
 npm run preview
 ```
 
+### Cloudflare Pages Frontend
+
+Deploy the React frontend through Cloudflare Pages using these settings:
+
+```text
+Framework preset: Vite
+Root directory: frontend
+Build command: npm run build
+Build output directory: dist
+```
+
+Add the frontend environment variable in the Cloudflare Pages dashboard:
+
+```text
+VITE_API_BASE_URL=https://your-backend-domain.com/api
+```
+
+Cloudflare Pages handles the frontend deployment. No Wrangler configuration or deploy command is required. The Express backend must be deployed separately on a Node.js host.
+
 For a production backend process:
 
 ```bash
