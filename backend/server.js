@@ -22,6 +22,7 @@ const { apiLimiter, authLimiter } = require('./middleware/rateLimiter')
 const { startRecurringScheduler } = require('./utils/recurringScheduler')
 
 const app = express()
+app.set('trust proxy', 1)
 
 if (!jwtSecret || jwtSecret.length < 32) {
   throw new Error('JWT_SECRET must be configured with at least 32 characters')
