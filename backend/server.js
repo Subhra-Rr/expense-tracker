@@ -1,4 +1,6 @@
 const express = require('express')
+const fs = require('fs')
+const path = require('path')
 const cors = require('cors')
 const helmet = require('helmet')
 const connectDatabase = require('./config/database')
@@ -23,6 +25,8 @@ const { startRecurringScheduler } = require('./utils/recurringScheduler')
 
 const app = express()
 app.set('trust proxy', 1)
+const frontendDistPath = path.resolve(__dirname, '../frontend/dist')
+const frontendIndexPath = path.join(frontendDistPath, 'index.html')
 
 if (!jwtSecret || jwtSecret.length < 32) {
   throw new Error('JWT_SECRET must be configured with at least 32 characters')
@@ -48,13 +52,6 @@ app.use(cors({
 }))
 app.use(express.json({ limit: '10kb' }))
 app.use('/api', apiLimiter)
-app.get('/', (_req, res) => {
-  res.status(200).json({
-    service: 'expense-tracker-api',
-    status: 'ok',
-    health: '/api/health',
-  })
-})
 app.use('/api/health', healthRoutes)
 app.use('/api/auth/register', authLimiter)
 app.use('/api/auth/login', authLimiter)
@@ -71,6 +68,28 @@ app.use('/api/savings-goals', savingsGoalRoutes)
 app.use('/api/transfers', transferRoutes)
 app.use('/api/reconciliations', reconciliationRoutes)
 app.use('/api/categories', categoryRoutes)
+app.use(express.static(frontendDistPath))
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || req.path === '/api' || req.path.startsWith('/api/')) {
+    return next()
+  }
+
+  if (fs.existsSync(frontendIndexPath)) {
+    return res.sendFile(frontendIndexPath, (error) => {
+      if (error) next(error)
+    })
+  }
+
+  if (req.path === '/') {
+    return res.status(200).json({
+      service: 'expense-tracker-api',
+      status: 'ok',
+      health: '/api/health',
+    })
+  }
+
+  return next()
+})
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' })
