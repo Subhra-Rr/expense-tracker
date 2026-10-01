@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import useAuth from '../context/useAuth'
-import useTheme from '../context/ThemeContext'
+import useTheme from '../context/useTheme'
 import api from '../services/api'
 import { errorMessage } from '../utils/errorMessage'
 

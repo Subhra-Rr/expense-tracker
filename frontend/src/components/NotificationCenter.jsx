@@ -20,9 +20,26 @@ function NotificationCenter() {
   }
 
   useEffect(() => {
-    void load()
-    const timer = setInterval(() => { void load() }, 60000)
-    return () => clearInterval(timer)
+    let active = true
+    const refresh = () => {
+      Promise.all([api.get('/notifications'), api.get('/notifications/preferences')])
+        .then(([{ data: notificationData }, { data: preferenceData }]) => {
+          if (!active) return
+          setNotifications(notificationData.notifications)
+          setUnreadCount(notificationData.unreadCount)
+          setPreferences(preferenceData.preferences)
+          setError('')
+        })
+        .catch((requestError) => {
+          if (active) setError(errorMessage(requestError, 'Unable to load notifications'))
+        })
+    }
+    refresh()
+    const timer = setInterval(refresh, 60000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
   }, [])
 
   async function markRead(id) { await api.patch(`/notifications/${id}/read`); void load() }

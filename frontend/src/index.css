@@ -147,8 +147,12 @@ a:focus-visible {
   border-color: #a7f3d0;
 }
 
-.dashboard-shell [class~="text-white"] {
+.dashboard-shell [class~="text-white"]:not(button) {
   color: #17312b;
+}
+
+.dashboard-shell button[class~="text-white"] {
+  color: #ffffff;
 }
 
 .dashboard-shell [class~="text-slate-300"],
@@ -248,9 +252,25 @@ a:focus-visible {
   background-color: #09111f;
 }
 
-[data-theme="dark"] .dashboard-shell [class~="bg-slate-50"] {
+[data-theme="dark"] .dashboard-shell [class~="bg-slate-50"],
+[data-theme="dark"] .dashboard-shell [class~="bg-white"] {
   background-color: #172438;
   border-color: #2b3b52;
+}
+
+[data-theme="dark"] .dashboard-shell [class~="border-slate-100"],
+[data-theme="dark"] .dashboard-shell [class~="border-slate-200"] {
+  border-color: #2b3b52;
+}
+
+[data-theme="dark"] .dashboard-shell [class~="text-slate-900"]:not(button):not([class~="bg-cyan-400"]),
+[data-theme="dark"] .dashboard-shell [class~="text-slate-950"]:not(button):not([class~="bg-cyan-400"]) {
+  color: #e5edf5;
+}
+
+[data-theme="dark"] .dashboard-shell [class~="text-slate-700"]:not(button),
+[data-theme="dark"] .dashboard-shell [class~="text-slate-600"]:not(button) {
+  color: #c1cedb;
 }
 
 [data-theme="dark"] .dashboard-shell [class~="bg-slate-800"] {

@@ -23,7 +23,22 @@ function RecurringManager({ accounts }) {
   async function loadRules() {
     try { const { data } = await api.get('/recurring'); setRules(data.rules); setError('') } catch (requestError) { setError(errorMessage(requestError, 'Unable to load recurring rules')) } finally { setLoading(false) }
   }
-  useEffect(() => { void loadRules() }, [])
+  useEffect(() => {
+    let active = true
+    api.get('/recurring')
+      .then(({ data }) => {
+        if (!active) return
+        setRules(data.rules)
+        setError('')
+      })
+      .catch((requestError) => {
+        if (active) setError(errorMessage(requestError, 'Unable to load recurring rules'))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [])
 
   function update(event) {
     const next = { ...form, [event.target.name]: event.target.value }

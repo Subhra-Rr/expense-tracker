@@ -13,7 +13,19 @@ function TransfersAndReconciliation({ accounts, onChanged }) {
   const [saving, setSaving] = useState(false)
   const activeAccounts = accounts.filter((account) => !account.archived)
   async function load() { try { const [{ data: transferData }, { data: reconciliationData }] = await Promise.all([api.get('/transfers'), api.get('/reconciliations')]); setTransfers(transferData.transfers); setRecords(reconciliationData.reconciliations) } catch (requestError) { setError(errorMessage(requestError, 'Unable to load transfers and reconciliations')) } }
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    let active = true
+    Promise.all([api.get('/transfers'), api.get('/reconciliations')])
+      .then(([{ data: transferData }, { data: reconciliationData }]) => {
+        if (!active) return
+        setTransfers(transferData.transfers)
+        setRecords(reconciliationData.reconciliations)
+      })
+      .catch((requestError) => {
+        if (active) setError(errorMessage(requestError, 'Unable to load transfers and reconciliations'))
+      })
+    return () => { active = false }
+  }, [])
   async function submitTransfer(event) { event.preventDefault(); setSaving(true); setError(''); try { await api.post('/transfers', { ...transfer, amount: Number(transfer.amount) }, { headers: { 'Idempotency-Key': crypto.randomUUID() } }); setTransfer({ sourceAccount: '', destinationAccount: '', amount: '', date: today(), notes: '' }); await load(); onChanged() } catch (requestError) { setError(errorMessage(requestError, 'Unable to complete transfer')) } finally { setSaving(false) } }
   async function submitReconciliation(event) { event.preventDefault(); setSaving(true); setError(''); try { await api.post('/reconciliations', { ...reconcile, statementBalance: Number(reconcile.statementBalance) }); setReconcile({ account: '', statementBalance: '', reconciliationDate: today(), notes: '' }); await load() } catch (requestError) { setError(errorMessage(requestError, 'Unable to save reconciliation')) } finally { setSaving(false) } }
   async function adjust(record) { const reason = window.prompt('Why should the recorded balance be adjusted?'); if (!reason) return; setSaving(true); try { await api.patch(`/reconciliations/${record._id}/adjust`, { reason }); await load(); onChanged() } catch (requestError) { setError(errorMessage(requestError, 'Unable to apply adjustment')) } finally { setSaving(false) } }

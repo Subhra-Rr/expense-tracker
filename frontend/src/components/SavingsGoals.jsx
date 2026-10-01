@@ -17,7 +17,22 @@ function SavingsGoals() {
   const [saving, setSaving] = useState(false)
 
   async function loadGoals() { try { const { data } = await api.get('/savings-goals'); setGoals(data.goals); setError('') } catch (requestError) { setError(errorMessage(requestError, 'Unable to load savings goals')) } finally { setLoading(false) } }
-  useEffect(() => { void loadGoals() }, [])
+  useEffect(() => {
+    let active = true
+    api.get('/savings-goals')
+      .then(({ data }) => {
+        if (!active) return
+        setGoals(data.goals)
+        setError('')
+      })
+      .catch((requestError) => {
+        if (active) setError(errorMessage(requestError, 'Unable to load savings goals'))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [])
   function update(event) { setForm({ ...form, [event.target.name]: event.target.value }) }
   function edit(goal) { setEditingId(goal._id); setForm({ name: goal.name, targetAmount: goal.targetAmount, targetDate: goal.targetDate ? new Date(goal.targetDate).toISOString().slice(0, 10) : '', notes: goal.notes || '' }) }
   function cancel() { setEditingId(null); setForm(emptyGoal()) }
